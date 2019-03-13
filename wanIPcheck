@@ -19,7 +19,7 @@ lastIP="${dir}/lastIP.log"
 dnsConf="${dir}/ddns.conf"
 [ -f "$dnsConf" ] || exit 1
 
-emailAddr="justinmfrahm@gmail.com"
+emailAddr="email@example.com"
 dnsServer="dynamicdns.park-your-domain.com"
 oldIP=$(cat "$lastIP")
 newIP=$(~/bin/wanip)
