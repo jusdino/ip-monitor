@@ -1,0 +1,74 @@
+#!/bin/bash
+
+force=false
+while getopts :f opt; do
+    case "$opt" in
+        f)
+            force=true
+            ;;
+    esac
+done
+
+#Create necessary files, set variables
+dir=~/".wanip"
+[ -d "$dir" ] || mkdir "$dir"
+
+lastIP="${dir}/lastIP.log"
+[ -f "$lastIP" ] || touch "$lastIP"
+
+dnsConf="${dir}/ddns.conf"
+[ -f "$dnsConf" ] || exit 1
+
+emailAddr="justinmfrahm@gmail.com"
+dnsServer="dynamicdns.park-your-domain.com"
+oldIP=$(cat "$lastIP")
+newIP=$(~/bin/wanip)
+
+#If IP changed from log...
+if [[ "$newIP" == "$oldIP" ]] && [[ $force != true ]]; then
+    echo "$(date): WAN IP remains unchanged."
+else
+    echo "$(date): WAN IP changed to: $newIP"
+    echo "$newIP" > "$lastIP"
+
+    #Email out WAN IP update notice
+    mutt -e "set content_type=text/html" -s "WAN IP Change: $newIP" -- "$emailAddr" <<EOF
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WAN IP Change</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+	<div><h1>WAN IP Change</h1></div>
+        <div>The web server IP has changed!</div>
+        <div>the new IP address is:</div>
+        <div>$newIP</div>
+        <div></div>
+        <div>The web server:       <a href="http://$newIP/">http://$newIP/</a></div>
+    </body>
+</html>
+EOF
+
+    #Update DNS records
+    while IFS=',' read -r -a line -u 3; do
+
+        host="${line[0]}"
+        login="${line[1]}"
+        password="${line[2]}"
+
+        echo "Updating IP for:"
+        echo "Host: $host"
+        echo "Domain: $login"
+
+        #echo "GET REQUEST: ${dnsServer}/update?host=${host}&domain=${login}&password=${password}&ip=${newIP}"
+        wget -O - "${dnsServer}/update?host=${host}&domain=${login}&password=${password}&ip=${newIP}" 2>/dev/null | sed 's|<|\n<|g'
+        echo ""
+        echo ""
+
+    done 3<"$dnsConf"
+
+fi
+
+exit 0
